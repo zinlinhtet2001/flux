@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  creationTimestamp: null
+  name: prod-app
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: demo-pvc
+  namespace: prod-app
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: do-block-storage
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: prod-app
+  name: prod-app
+  namespace: prod-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: prod-app
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: prod-app
+    spec:
+      containers:
+      - image: nginx
+        name: nginx
+        resources:
+          requests:
+            memory: "50Mi"
+            cpu: "100m"
+          limits:
+            memory: "100Mi"
+            cpu: "300m"
+        volumeMounts:
+        - mountPath: /usr/share/nginx/html/index.html
+          name: data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: demo-pvc
+---
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  creationTimestamp: null
+  name: prod-hpa
+  namespace: prod-app
+spec:
+  maxReplicas: 4
+  minReplicas: 2
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: prod-app
+  targetCPUUtilizationPercentage: 60
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    app: prod-app
+  name: prod-svc
+  namespace: prod-app
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: prod-app
